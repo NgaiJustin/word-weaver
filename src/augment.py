@@ -1,4 +1,5 @@
 import sys
+import random
 from dataclasses import dataclass
 
 import pandas as pd
@@ -20,18 +21,32 @@ class Entry:
     label: int
 
 
-def process_entry(entry: pd.Series):
+def process_entry(entry: pd.Series, shuffle_letters: bool) -> pd.DataFrame:
     """
     Process a single row from the csv
     """
-    print(f"Before: {entry.sentence}")
-    entry.sentence = entry.sentence.replace(
+    word = entry.fake_lemma
+    sentence_with_word = entry.sentence.replace(
         "_", entry.option2 if entry.label == 1 else entry.option1
     )
-    entry.sentence = entry.sentence.replace(entry.fake_lemma, "_")
-    print(f"After: {entry.sentence}")
+    defintion_of_word = entry.definition
 
-    return entry.sentence
+    if shuffle_letters:
+        # TODO: perhaps consider a smarter way to shuffle the letter so that the word looks more
+        # like a English word
+        shuffle_word = list(word)
+        random.shuffle(shuffle_word)
+        word = "".join(shuffle_word)
+        sentence_with_word = sentence_with_word.replace(entry.fake_lemma, word)
+        defintion_of_word = defintion_of_word.replace(entry.fake_lemma, word)
+
+    return pd.DataFrame(
+        {
+            "word": [word],
+            "sentence": [sentence_with_word],
+            "definition": [defintion_of_word],
+        }
+    )
 
 
 def augment_csv(csv_path):
@@ -42,15 +57,16 @@ def augment_csv(csv_path):
     """
     # read csv
     df = pd.read_csv(csv_path)
+    augmented_df = pd.DataFrame(columns=["word", "sentence", "definition"])
 
-    # augment data
-    augmented_data = df.apply(process_entry, axis=1)  # type: ignore
-
-    # add new column to df
-    df[csv_path[:-4] + "_augmented"] = augmented_data
+    # create a new augmented_df by processing each entry
+    for i, entry in tqdm(df.iterrows(), total=len(df)):
+        shuffle_letters = int(i) % 2 == 0  # type: ignore
+        processed_df = process_entry(entry, shuffle_letters)
+        augmented_df = pd.concat([augmented_df, processed_df], ignore_index=True)  # type: ignore
 
     # write to new csv
-    df.to_csv(csv_path[:-4] + "_augmented.csv", index=False)
+    augmented_df.to_csv(csv_path[:-4] + "_augmented.csv", index=False)
 
 
 if __name__ == "__main__":
