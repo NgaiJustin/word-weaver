@@ -1,5 +1,37 @@
-import pandas as pd
 import sys
+from dataclasses import dataclass
+
+import pandas as pd
+from tqdm import tqdm
+
+
+@dataclass
+class Entry:
+    id: int
+    lemma: str
+    fake_lemma: str
+    pos: str
+    tag: str
+    pronoun: str
+    definition: str
+    sentence: str
+    option1: str
+    option2: str
+    label: int
+
+
+def process_entry(entry: pd.Series):
+    """
+    Process a single row from the csv
+    """
+    print(f"Before: {entry.sentence}")
+    entry.sentence = entry.sentence.replace(
+        "_", entry.option2 if entry.label == 1 else entry.option1
+    )
+    entry.sentence = entry.sentence.replace(entry.fake_lemma, "_")
+    print(f"After: {entry.sentence}")
+
+    return entry.sentence
 
 
 def augment_csv(csv_path):
@@ -12,9 +44,7 @@ def augment_csv(csv_path):
     df = pd.read_csv(csv_path)
 
     # augment data
-    augmented_data = []
-    for row in df.iterrows():
-        augmented_data.append(row[1][0] + 1)
+    augmented_data = df.apply(process_entry, axis=1)  # type: ignore
 
     # add new column to df
     df[csv_path[:-4] + "_augmented"] = augmented_data
